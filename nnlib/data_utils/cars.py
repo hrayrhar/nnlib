@@ -45,5 +45,8 @@ class Cars(StandardVisionDataset):
             self.normalize_transform,
         ])
 
-    def raw_dataset(self, data_dir: str, download: bool, train: bool, transform):
-        return cars.Cars(data_dir, train=train, download=download, transform=transform)
+    def raw_dataset(self, data_dir: str, download: bool, split: str, transform):
+        assert split in ['train', 'val', 'test']
+        if split == 'val':
+            return None  # no predetermined validation set
+        return cars.Cars(data_dir, train=(split == 'train'), download=download, transform=transform)

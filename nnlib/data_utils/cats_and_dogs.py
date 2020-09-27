@@ -1,5 +1,6 @@
 import os
 import logging
+logging.basicConfig(level=logging.INFO)
 
 from torchvision import transforms
 from torchvision.datasets import ImageFolder
@@ -48,8 +49,12 @@ class CatsAndDogs(StandardVisionDataset):
             self.normalize_transform,
         ])
 
-    def raw_dataset(self, data_dir: str, download: bool, train: bool, transform):
-        if not train:
+    def raw_dataset(self, data_dir: str, download: bool, split: str, transform):
+        assert split in ['train', 'val', 'test']
+        if split == 'train':
+            return ImageFolder(os.path.join(data_dir, 'PetImages'), transform=transform)
+        if split == 'test':
             logging.warning("The cats and dogs dataset has only training set. "
                             "Instead of a testing set the training set will be returned.")
-        return ImageFolder(os.path.join(data_dir, 'PetImages'), transform=transform)
+            return ImageFolder(os.path.join(data_dir, 'PetImages'), transform=transform)
+        return None  # no predetermined validation set

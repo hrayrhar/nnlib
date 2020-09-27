@@ -44,6 +44,10 @@ class ImageNet(StandardVisionDataset):
             self.normalize_transform,
         ])
 
-    def raw_dataset(self, data_dir: str, download: bool, train: bool, transform):
-        split = ("train" if train else "val")
-        return datasets.ImageNet(data_dir, download=download, split=split, transform=transform)
+    def raw_dataset(self, data_dir: str, download: bool, split: str, transform):
+        assert split in ['train', 'val', 'test']
+        if split == 'val':
+            return None  # no predetermined validation set
+        imagenet_split = ("train" if split == 'train' else "val")
+        # NOTE: as test set, the validation set of the ImageNet will be returned
+        return datasets.ImageNet(data_dir, download=download, split=imagenet_split, transform=transform)

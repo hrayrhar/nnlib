@@ -3,18 +3,18 @@ import torch
 
 from .base import log_call_parameters
 from .abstract import StandardVisionDataset
-from .torch_extensions import birds
+from .tensorflow import SimpleTensorFlowDataset
 
 
-class Birds(StandardVisionDataset):
+class Cassava(StandardVisionDataset):
     @log_call_parameters
     def __init__(self, data_augmentation: bool = False, **kwargs):
-        super(Birds, self).__init__(**kwargs)
+        super(Cassava, self).__init__(**kwargs)
         self.data_augmentation = data_augmentation
 
     @property
     def dataset_name(self) -> str:
-        return "birds"
+        return "cassava"
 
     @property
     def means(self):
@@ -48,5 +48,7 @@ class Birds(StandardVisionDataset):
     def raw_dataset(self, data_dir: str, download: bool, split: str, transform):
         assert split in ['train', 'val', 'test']
         if split == 'val':
-            return None  # no predetermined validation set
-        return birds.Birds(data_dir, train=(split == 'train'), download=download, transform=transform)
+            split = 'validation'
+        return SimpleTensorFlowDataset(name='cassava', data_dir=data_dir,
+                                       split=split, transform=transform,
+                                       as_supervised=True, download=download)

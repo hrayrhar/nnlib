@@ -39,10 +39,13 @@ class EMNIST(StandardVisionDataset):
             self.normalize_transform
         ])
 
-    def raw_dataset(self, data_dir: str, download: bool, train: bool, transform):
+    def raw_dataset(self, data_dir: str, download: bool, split: str, transform):
+        assert split in ['train', 'val', 'test']
         if self.split == 'letters':
             target_transform = (lambda x: x - 1)
         else:
             target_transform = None
-        return datasets.EMNIST(data_dir, split=self.split, download=download, train=train, transform=transform,
-                               target_transform=target_transform)
+        if split == 'val':
+            return None  # no predetermined validation set
+        return datasets.EMNIST(data_dir, split=self.split, download=download, train=(split == 'train'),
+                               transform=transform, target_transform=target_transform)

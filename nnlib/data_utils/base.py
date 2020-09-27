@@ -286,6 +286,15 @@ class DataSelector:
         else:
             return data_builder.build_datasets(**args)
 
+    @register_parser(_parsers, 'cassava')
+    def _parse_icassava(self, args, build_loaders=True):
+        from .cassava import Cassava
+        data_builder = Cassava(**args)
+        if build_loaders:
+            return data_builder.build_loaders(**args)
+        else:
+            return data_builder.build_datasets(**args)
+
     def can_parse(self, dataset_name):
         return dataset_name in self._parsers
 

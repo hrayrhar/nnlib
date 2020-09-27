@@ -16,7 +16,7 @@ attribute_names = ['5_o_Clock_Shadow', 'Arched_Eyebrows', 'Attractive', 'Bags_Un
 
 class CelebA(StandardVisionDataset):
     @log_call_parameters
-    def __init__(self, data_augmentation: bool = False, target_type = 'attr', **kwargs):
+    def __init__(self, data_augmentation: bool = False, target_type: str = 'attr', **kwargs):
         super(CelebA, self).__init__(**kwargs)
         self.data_augmentation = data_augmentation
         self.target_type = target_type
@@ -52,7 +52,9 @@ class CelebA(StandardVisionDataset):
             self.normalize_transform
         ])
 
-    def raw_dataset(self, data_dir: str, download: bool, train: bool, transform):
-        split = ('train' if train else 'test')
+    def raw_dataset(self, data_dir: str, download: bool, split: str, transform):
+        assert split in ['train', 'val', 'test']
+        if split == 'val':
+            split = 'valid'
         return datasets.CelebA(data_dir, download=download, split=split, transform=transform,
                                target_type=self.target_type)

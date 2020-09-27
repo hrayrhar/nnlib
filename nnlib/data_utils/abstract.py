@@ -1,10 +1,13 @@
 from abc import abstractmethod, ABC
+import os
+import logging
+logging.basicConfig(level=logging.INFO)
+
+import numpy as np
+
 from torch.utils.data import Subset
 from torchvision import transforms
 from .base import get_split_indices, print_loaded_dataset_shapes, get_loaders_from_datasets, log_call_parameters
-
-import os
-import numpy as np
 
 
 class StandardVisionDataset(ABC):
@@ -31,7 +34,7 @@ class StandardVisionDataset(ABC):
         raise NotImplementedError('stds not implemented')
 
     @abstractmethod
-    def raw_dataset(self, data_dir: str, download: bool, train: bool, transform):
+    def raw_dataset(self, data_dir: str, download: bool, split: str, transform):
         raise NotImplementedError('raw_dataset_class not implemented, need to return datasets')
 
     @property
@@ -47,7 +50,7 @@ class StandardVisionDataset(ABC):
 
     @property
     def test_transforms(self):
-        return self.train_transforms()
+        return self.train_transforms
 
     def post_process_datasets(self, train_data, val_data, test_data, info=None):
         """ This can be used to modify the labels or images. """
@@ -61,16 +64,23 @@ class StandardVisionDataset(ABC):
         if data_dir is None:
             data_dir = os.path.join(os.environ['DATA_DIR'], self.dataset_name)
 
-        train_data = self.raw_dataset(data_dir, download=download, train=True, transform=self.train_transforms)
-        val_data = self.raw_dataset(data_dir, download=download, train=True, transform=self.train_transforms)
-        test_data = self.raw_dataset(data_dir, download=download, train=False, transform=self.test_transforms)
+        train_data = self.raw_dataset(data_dir, download=download, split='train', transform=self.train_transforms)
+        val_data = self.raw_dataset(data_dir, download=download, split='val', transform=self.train_transforms)
+        test_data = self.raw_dataset(data_dir, download=download, split='test', transform=self.test_transforms)
 
         # split train and validation
-        train_indices, val_indices = get_split_indices(len(train_data), val_ratio, seed)
-        if num_train_examples is not None:
-            train_indices = np.random.choice(train_indices, num_train_examples, replace=False)
-        train_data = Subset(train_data, train_indices)
-        val_data = Subset(val_data, val_indices)
+        if val_data is None:
+            logging.info(f"Dataset {self.dataset_name} has no validation set. Splitting the training set...")
+            train_indices, val_indices = get_split_indices(len(train_data), val_ratio, seed)
+            if num_train_examples is not None:
+                train_indices = np.random.choice(train_indices, num_train_examples, replace=False)
+            val_data = Subset(train_data, val_indices)
+            train_data = Subset(train_data, train_indices)
+        else:
+            # subsample training set separately if needed
+            if num_train_examples is not None:
+                train_indices = np.random.choice(len(train_data), num_train_examples, replace=False)
+                train_data = Subset(train_data, train_indices)
 
         # general way of returning extra information
         info = None

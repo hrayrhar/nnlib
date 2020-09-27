@@ -1,5 +1,7 @@
 from PIL import Image
 import os
+import logging
+logging.basicConfig(level=logging.INFO)
 
 from torchvision import transforms
 from torch.utils.data import Subset, Dataset
@@ -11,15 +13,16 @@ from .abstract import StandardVisionDataset
 
 
 class Clothing1MRaw(Dataset):
-    def __init__(self, root, img_transform, train=False, validation=False, test=False):
+    def __init__(self, root, img_transform, split: str):
         self.root = root
-        if train:
+        if split == 'train':
             flist = os.path.join(root, "dmi_annotations/noisy_train.txt")
-        if validation:
+        elif split == 'val':
             flist = os.path.join(root, "dmi_annotations/clean_val.txt")
-        if test:
+        elif split == 'test':
             flist = os.path.join(root, "dmi_annotations/clean_test.txt")
-
+        else:
+            raise ValueError(f"Split should be 'train', 'val', or 'test'.")
         self.imlist = self.flist_reader(flist)
         self.transform = img_transform
 
@@ -91,16 +94,16 @@ class Clothing1M(StandardVisionDataset):
     def build_datasets(self, data_dir: str = None, val_ratio: float = 0.2, num_train_examples: int = None,
                        seed: int = 42, **kwargs):
         """ Builds train, validation, and test datasets. """
-        print(f"val_ratio is ignored as {self.dataset_name} does not require splitting")
-        print(f"Building datasets of {self.dataset_name} with data_dir={data_dir}, "
-              f"num_train_examples={num_train_examples}, seed={seed}")
+        logging.info(f"val_ratio is ignored as {self.dataset_name} does not require splitting")
+        logging.info(f"Building datasets of {self.dataset_name} with data_dir={data_dir}, "
+                     f"num_train_examples={num_train_examples}, seed={seed}")
 
         if data_dir is None:
             data_dir = os.path.join(os.environ['DATA_DIR'], self.dataset_name)
 
-        train_data = Clothing1MRaw(root=data_dir, train=True, img_transform=self.train_transforms)
-        val_data = Clothing1MRaw(root=data_dir, validation=True, img_transform=self.test_transforms)
-        test_data = Clothing1MRaw(root=data_dir, test=True, img_transform=self.test_transforms)
+        train_data = Clothing1MRaw(root=data_dir, split='train', img_transform=self.train_transforms)
+        val_data = Clothing1MRaw(root=data_dir, split='val', img_transform=self.test_transforms)
+        test_data = Clothing1MRaw(root=data_dir, split='test', img_transform=self.test_transforms)
 
         np.random.seed(seed)
         if num_train_examples is not None:

@@ -41,8 +41,12 @@ class MNIST(StandardVisionDataset):
             self.normalize_transform
         ])
 
-    def raw_dataset(self, data_dir: str, download: bool, train: bool, transform):
-        return datasets.MNIST(data_dir, download=download, train=train, transform=transform)
+    def raw_dataset(self, data_dir: str, download: bool, split: str, transform):
+        assert split in ['train', 'val', 'test']
+        if split == 'val':
+            return None  # no predetermined validation set
+        return datasets.MNIST(data_dir, download=download, train=(split == 'train'),
+                              transform=transform)
 
 
 class NoisyMNIST(MNIST):
