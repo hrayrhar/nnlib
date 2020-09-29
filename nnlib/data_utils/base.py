@@ -295,6 +295,15 @@ class DataSelector:
         else:
             return data_builder.build_datasets(**args)
 
+    @register_parser(_parsers, 'oxford-flowers-102')
+    def _parse_oxford_flowers_102(self, args, build_loaders=True):
+        from .oxford_flowers_102 import OxfordFlowers102
+        data_builder = OxfordFlowers102(**args)
+        if build_loaders:
+            return data_builder.build_loaders(**args)
+        else:
+            return data_builder.build_datasets(**args)
+
     def can_parse(self, dataset_name):
         return dataset_name in self._parsers
 
