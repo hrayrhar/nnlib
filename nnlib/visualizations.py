@@ -265,7 +265,7 @@ def plot_images(images, n_rows=None, n_cols=None, titles=None, one_image_size=No
 
 
 def plot_examples_from_dataset(data, indices, n_rows=None, n_cols=None, one_image_size=None, savename=None, plt=None,
-                               is_label_one_hot=False, **kwargs):
+                               is_label_one_hot=False, skip_titles=False, label_names=None, **kwargs):
     n = len(indices)
     images = []
     titles = []
@@ -273,9 +273,16 @@ def plot_examples_from_dataset(data, indices, n_rows=None, n_cols=None, one_imag
         x, y = data[indices[i]]
         if is_label_one_hot:
             y = torch.argmax(y)
+        if isinstance(y, torch.Tensor) and y.ndim == 0:
+            y = y.item()
         x = revert_normalization(x, data)[0]
         x = utils.to_numpy(x)
         images.append(get_image(x))
-        titles.append(f'label {y}')
-    return plot_images(images=images, n_rows=n_rows, n_cols=n_cols, titles=titles, one_image_size=one_image_size,
-                       savename=savename, plt=plt)
+        if label_names is None:
+            titles.append(f'class {y}')
+        else:
+            titles.append(label_names[y])
+    if skip_titles:
+        titles = None
+    return plot_images(images=images, n_rows=n_rows, n_cols=n_cols, titles=titles,
+                       one_image_size=one_image_size, savename=savename, plt=plt)
