@@ -218,5 +218,21 @@ def parse_network_from_config(args, input_shape):
             print("output.shape:", output_shape)
             return net, output_shape
 
+        if args['net'] in ['densenet121']:
+            from torchvision.models import densenet121
+
+            num_classes = args.get('num_classes', 1000)
+            pretrained = args.get('pretrained', False)
+
+            # if pretraining is enabled but number of classes is not 1000 replace the last layer
+            if pretrained and num_classes != 1000:
+                net = densenet121(num_classes=1000, pretrained=pretrained)
+                net.classifier = nn.Linear(net.classifier.in_features, num_classes)
+            else:
+                net = densenet121(num_classes=num_classes, pretrained=pretrained)
+            output_shape = infer_shape([net], input_shape)
+            print("output.shape:", output_shape)
+            return net, output_shape
+
     # parse feed forward
     return parse_feed_forward(args, input_shape)
