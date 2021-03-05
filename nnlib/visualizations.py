@@ -14,6 +14,7 @@ from . import utils
 from .data_utils.base import revert_normalization
 from .matplotlib_utils import import_matplotlib
 
+from .data_utils.base import get_first_input
 
 def get_image(x):
     """ Takes (1, H, W) or (3, H, W) and outputs (H, W, 3) """
@@ -35,8 +36,8 @@ def reconstruction_plot(model, train_data, val_data, n_samples=5, plt=None):
     model.eval()
     if plt is None:
         _, plt = import_matplotlib(agg=True, use_style=False)
-    train_samples = [train_data[i][0] for i in range(n_samples)]
-    val_samples = [val_data[i][0] for i in range(n_samples)]
+    train_samples = [get_first_input(train_data, i) for i in range(n_samples)]
+    val_samples = [get_first_input(val_data, i) for i in range(n_samples)]
     samples = torch.stack(train_samples + val_samples, dim=0)
     x_rec = model(inputs=[samples])['x_rec']
     x_rec = x_rec.reshape(samples.shape)
@@ -195,8 +196,8 @@ def plot_predictions(model, data_loader, key, plt=None, n_examples=10):
     probs = torch.softmax(pred, dim=1)
     probs = utils.to_numpy(probs)
 
-    data = [data_loader.dataset[i][0] for i in range(n_examples)]
-    labels = [data_loader.dataset[i][1] for i in range(n_examples)]
+    data = [get_first_input(data_loader.dataset, i) for i in range(n_examples)]
+    labels = [get_first_input(data_loader.dataset, i) for i in range(n_examples)]
     samples = torch.stack(data, dim=0)
     samples = revert_normalization(samples, data_loader.dataset)
     samples = utils.to_numpy(samples)
@@ -270,7 +271,8 @@ def plot_examples_from_dataset(data, indices, n_rows=None, n_cols=None, one_imag
     images = []
     titles = []
     for i in range(n):
-        x, y = data[indices[i]]
+        x = get_first_input(data, indices[i])
+        y = data[indices[i]][1]
         if is_label_one_hot:
             y = torch.argmax(y)
         if isinstance(y, torch.Tensor) and y.ndim == 0:

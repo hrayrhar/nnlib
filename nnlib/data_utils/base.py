@@ -55,6 +55,13 @@ def get_input_shape(train_data):
     return example_inputs.shape
 
 
+def get_first_input(dataset, index):
+    x = dataset[index][0]
+    if isinstance(x, list) or isinstance(x, tuple):
+        return x[0]
+    return x
+
+
 def print_loaded_dataset_shapes(build_datasets_fn):
     def wrapper(*args, **kwargs):
         train_data, val_data, test_data, info = build_datasets_fn(*args, **kwargs)
