@@ -34,15 +34,18 @@ class Metric(ABC):
 class Accuracy(Metric):
     """ Accuracy metric. Works in both binary and multiclass classification settings.
     """
-    def __init__(self, output_key: str = 'pred', threshold=0.5, one_hot=False, **kwargs):
+    def __init__(self, output_key: str = 'pred', threshold=0.5, one_hot=False,
+                 plus_minus_one_binary=False, **kwargs):
         """
         :param threshold: in the case of binary classification what threshold to use
         :param one_hot: whether the labels is in one-hot encoding
+        :param plus_minus_one_binary: in case of binary labels, this specifies whether it is (0 vs 1) or (-1 vs +1)
         """
         super(Accuracy, self).__init__(**kwargs)
         self.output_key = output_key
         self.threshold = threshold
         self.one_hot = one_hot
+        self.plus_minus_one_binary = plus_minus_one_binary
 
         # initialize and use later
         self._accuracy_storage = defaultdict(list)
@@ -71,6 +74,9 @@ class Accuracy(Metric):
         else:
             # binary classification
             pred = utils.to_numpy(out.squeeze(dim=-1) > self.threshold).astype(np.int)
+            if self.plus_minus_one_binary:
+                pred = 2 * pred - 1
+
         batch_labels = utils.to_numpy(batch_labels[0]).astype(np.int)
         if self.one_hot:
             batch_labels = np.argmax(batch_labels, axis=1)
