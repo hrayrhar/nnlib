@@ -82,7 +82,8 @@ def parse_feed_forward(args, input_shape):
         if layer_type == 'fc':
             dim = cur_layer['dim']
             assert len(prev_shape) == 2
-            net.append(nn.Linear(prev_shape[1], dim))
+            bias = cur_layer.get('bias', True)
+            net.append(nn.Linear(prev_shape[1], dim, bias=bias))
             if cur_layer.get('batch_norm', False):
                 net.append(nn.BatchNorm1d(dim))
             add_activation(net, cur_layer.get('activation', 'linear'))
