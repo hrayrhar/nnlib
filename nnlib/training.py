@@ -41,9 +41,9 @@ def build_optimizer(named_params, optimization_args):
     optimizer = None
     name = args.pop('name', 'adam')
     if name == 'adam':
-        optimizer = optim.Adam(params, **args)
+        optimizer = utils.call_fn_ignoring_unexpected_args(optim.Adam, params, **args)
     elif name == 'sgd':
-        optimizer = optim.SGD(params, **args)
+        optimizer = utils.call_fn_ignoring_unexpected_args(optim.SGD, params, **args)
     else:
         raise ValueError(f"Optimizer with name '{name}' is not supported")
     return optimizer
@@ -68,8 +68,26 @@ def build_scheduler(optimizer, optimization_args):
     return scheduler
 
 
+def apply_weight_update_(model, optimizer, current_total_number_of_samples, grad_clip_norm=None):
+    # adjust the weight of gradients
+    for v in model.parameters():
+        if v.requires_grad:
+            v.grad /= current_total_number_of_samples
+
+    # some models might need to do something before applying gradients (e.g. clipping or adding noise)
+    # TODO: if data parallelism is on, each model should call its before_weight_update
+    if hasattr(model, 'before_weight_update'):
+        model.before_weight_update()
+
+    # clip the gradients if needed
+    if grad_clip_norm is not None:
+        torch.nn.utils.clip_grad_norm(model.parameters(), max_norm=grad_clip_norm)
+
+    optimizer.step()
+
+
 def run_partition(model, epoch, tensorboard, optimizer, loader, partition, training, metrics,
-                  data_parallel_model=None, num_accumulation_steps=1):
+                  data_parallel_model=None, num_accumulation_steps=1, grad_clip_norm=None):
     # call on_epoch_start callbacks
     if hasattr(model, 'on_epoch_start'):
         model.on_epoch_start(epoch=epoch, tensorboard=tensorboard, partition=partition, loader=loader)
@@ -116,17 +134,9 @@ def run_partition(model, epoch, tensorboard, optimizer, loader, partition, train
 
             # update the parameters
             if current_step_idx == num_accumulation_steps - 1:
-                # adjust the weight of gradients
-                for v in model.parameters():
-                    if v.requires_grad:
-                        v.grad /= current_total_number_of_samples
-
-                # some models might need to do something before applying gradients (e.g. clipping or adding noise)
-                # TODO: if data parallelism is on, each model should call its before_weight_update
-                if hasattr(model, 'before_weight_update'):
-                    model.before_weight_update()
-
-                optimizer.step()
+                apply_weight_update_(model=model, optimizer=optimizer,
+                                     current_total_number_of_samples=current_total_number_of_samples,
+                                     grad_clip_norm=grad_clip_norm)
 
         # call on_iteration_end callbacks
         if hasattr(model, 'on_iteration_end'):
@@ -153,15 +163,9 @@ def run_partition(model, epoch, tensorboard, optimizer, loader, partition, train
     if training and current_step_idx > 0:
         logging.warning('The number of training steps in one epoch is not a multiple of '
                         'number of accumulation steps')
-        # adjust the weight of gradients
-        for v in model.parameters():
-            if v.requires_grad:
-                v.grad /= current_total_number_of_samples
-
-        if hasattr(model, 'before_weight_update'):
-            model.before_weight_update()
-
-        optimizer.step()
+        apply_weight_update_(model=model, optimizer=optimizer,
+                             current_total_number_of_samples=current_total_number_of_samples,
+                             grad_clip_norm=grad_clip_norm)
 
     # call on_epoch_end callbacks
     if hasattr(model, 'on_epoch_end'):
@@ -181,7 +185,8 @@ def make_markdown_table_from_dict(params_dict):
 
 def train(model, train_loader, val_loader, epochs, save_iter=10, vis_iter=4,
           optimization_args=None, log_dir=None, args_to_log=None, metrics=None,
-          callbacks=None, stopper=None, device_ids=None, num_accumulation_steps=1):
+          callbacks=None, stopper=None, device_ids=None, num_accumulation_steps=1,
+          grad_clip_norm=None):
     """ Trains the model. Validation loader can be None.
     Assumptions:
     1. loaders return (batch_inputs, batch_labels), where both can be lists or torch.Tensors
@@ -241,7 +246,8 @@ def train(model, train_loader, val_loader, epochs, save_iter=10, vis_iter=4,
         train_losses = run_partition(model=model, epoch=epoch, tensorboard=tensorboard, optimizer=optimizer,
                                      loader=train_loader, partition='train', training=True, metrics=metrics,
                                      data_parallel_model=data_parallel_model,
-                                     num_accumulation_steps=num_accumulation_steps)
+                                     num_accumulation_steps=num_accumulation_steps,
+                                     grad_clip_norm=grad_clip_norm)
 
         val_losses = {}
         if val_loader is not None:
@@ -251,7 +257,8 @@ def train(model, train_loader, val_loader, epochs, save_iter=10, vis_iter=4,
             val_losses = run_partition(model=model, epoch=epoch, tensorboard=tensorboard, optimizer=optimizer,
                                        loader=val_loader, partition='val', training=False, metrics=metrics,
                                        data_parallel_model=data_parallel_model,
-                                       num_accumulation_steps=1)
+                                       num_accumulation_steps=1,
+                                       grad_clip_norm=grad_clip_norm)
 
         # log some statistics
         t = time.time()
