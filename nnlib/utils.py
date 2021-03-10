@@ -229,3 +229,13 @@ class Timing(object):
     def __exit__(self, type, value, traceback):
         end_time = time.time()
         print(f'[{self.description}] time={end_time - self._start_time:.1f}s')
+
+
+def call_fn_ignoring_unexpected_args(fn, *args, **kwargs):
+    existing_arguments = inspect.signature(fn).parameters.values()
+    existing_arguments = [p.name for p in existing_arguments]
+    filtered_kwargs = {}
+    for k, v in kwargs.items():
+        if k in existing_arguments:
+            filtered_kwargs[k] = v
+    return fn(*args, **filtered_kwargs)
