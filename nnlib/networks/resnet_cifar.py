@@ -43,7 +43,7 @@ class Bottleneck(nn.Module):
         if stride != 1 or in_planes != self.expansion*planes:
             self.shortcut = nn.Sequential(
                 nn.Conv2d(in_planes, self.expansion*planes, kernel_size=1, stride=stride, bias=False),
-                nn.norm_layer(self.expansion*planes)
+                norm_layer(self.expansion*planes)
             )
 
     def forward(self, x):
