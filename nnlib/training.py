@@ -68,13 +68,8 @@ def build_scheduler(optimizer, optimization_args):
     return scheduler
 
 
-def apply_weight_update_(model, optimizer, current_total_number_of_samples, grad_clip_norm=None):
-    # adjust the weight of gradients
-    for v in model.parameters():
-        if v.requires_grad:
-            v.grad /= current_total_number_of_samples
-
-    # some models might need to do something before applying gradients (e.g. clipping or adding noise)
+def _apply_weight_update(model, optimizer, grad_clip_norm=None):
+    # some models might need to do something before applying gradients (e.g. adding noise)
     # TODO: if data parallelism is on, each model should call its before_weight_update
     if hasattr(model, 'before_weight_update'):
         model.before_weight_update()
@@ -95,9 +90,7 @@ def run_partition(model, epoch, tensorboard, optimizer, loader, partition, train
         metric.on_epoch_start(epoch=epoch, partition=partition)
 
     losses = defaultdict(list)
-    total_number_of_samples = 0
     current_step_idx = 0
-    current_total_number_of_samples = 0
 
     for (batch_data, batch_labels) in tqdm(loader, desc='{} batches'.format(partition)):
         # make the input and labels lists
@@ -106,12 +99,8 @@ def run_partition(model, epoch, tensorboard, optimizer, loader, partition, train
         if isinstance(batch_labels, torch.Tensor):
             batch_labels = [batch_labels]
 
-        # compute actual batch size
-        actual_batch_size = len(batch_data[0])
-
         # zero gradients in training phase
         if training and current_step_idx == 0:
-            current_total_number_of_samples = 0
             optimizer.zero_grad()
 
         # forward pass
@@ -125,17 +114,14 @@ def run_partition(model, epoch, tensorboard, optimizer, loader, partition, train
                                                        grad_enabled=training, loader=loader, dataset=loader.dataset,
                                                        epoch=epoch, partition=partition)
             batch_total_loss = sum([loss for name, loss in batch_losses.items()])
-            batch_total_loss_adjusted = batch_total_loss * actual_batch_size
-            current_total_number_of_samples += actual_batch_size
 
         if training:
             # backward pass
-            batch_total_loss_adjusted.backward()
+            batch_total_loss.backward()
 
             # update the parameters
             if current_step_idx == num_accumulation_steps - 1:
-                apply_weight_update_(model=model, optimizer=optimizer,
-                                     current_total_number_of_samples=current_total_number_of_samples,
+                _apply_weight_update(model=model, optimizer=optimizer,
                                      grad_clip_norm=grad_clip_norm)
 
         # call on_iteration_end callbacks
@@ -149,22 +135,20 @@ def run_partition(model, epoch, tensorboard, optimizer, loader, partition, train
         if len(batch_losses) > 1:
             batch_losses['total'] = batch_total_loss
         for k, v in batch_losses.items():
-            losses['{}_{}'.format(partition, k)].append(actual_batch_size * utils.to_numpy(v))
-        total_number_of_samples += actual_batch_size
+            losses['{}_{}'.format(partition, k)].append(utils.to_numpy(v))
 
         # update the step counter
         current_step_idx = (current_step_idx + 1) % num_accumulation_steps
 
     for k, v in losses.items():
-        losses[k] = np.sum(v) / total_number_of_samples
+        losses[k] = np.mean(v)
         tensorboard.add_scalar('losses/{}'.format(k), losses[k], epoch)
 
     # if some gradient is left to apply
     if training and current_step_idx > 0:
         logging.warning('The number of training steps in one epoch is not a multiple of '
                         'number of accumulation steps')
-        apply_weight_update_(model=model, optimizer=optimizer,
-                             current_total_number_of_samples=current_total_number_of_samples,
+        _apply_weight_update(model=model, optimizer=optimizer,
                              grad_clip_norm=grad_clip_norm)
 
     # call on_epoch_end callbacks
