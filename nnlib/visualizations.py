@@ -13,8 +13,8 @@ import torch
 from . import utils
 from .data_utils.base import revert_normalization
 from .matplotlib_utils import import_matplotlib
-
 from .data_utils.base import get_first_input
+
 
 def get_image(x):
     """ Takes (1, H, W) or (3, H, W) and outputs (H, W, 3) """
@@ -197,7 +197,7 @@ def plot_predictions(model, data_loader, key, plt=None, n_examples=10):
     probs = utils.to_numpy(probs)
 
     data = [get_first_input(data_loader.dataset, i) for i in range(n_examples)]
-    labels = [get_first_input(data_loader.dataset, i) for i in range(n_examples)]
+    labels = [data_loader.dataset[i][1] for i in range(n_examples)]
     samples = torch.stack(data, dim=0)
     samples = revert_normalization(samples, data_loader.dataset)
     samples = utils.to_numpy(samples)
