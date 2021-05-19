@@ -4,6 +4,7 @@ import re
 import inspect
 import copy
 import time
+import random
 
 from torch.utils.data import Subset, DataLoader
 from tqdm import tqdm
@@ -69,6 +70,10 @@ def save(model, path, optimizer=None, scheduler=None):
     save_dict['model'] = model.state_dict()
     save_dict['args'] = model.args
 
+    # if the model has extra arguments or state variables to save
+    if hasattr(model, 'attributes_to_save'):
+        save_dict['model_attr'] = model.attributes_to_save()
+
     if optimizer is not None:
         save_dict['optimizer'] = optimizer.state_dict()
 
@@ -96,6 +101,12 @@ def load(path, methods, device=None, verbose=False, update_args_dict=None):
         print(model)
 
     model.load_state_dict(saved_dict['model'])
+
+    # load the saved state attributes
+    if 'model_attr' in saved_dict:
+        for k, v in saved_dict['model_attr'].items():
+            setattr(model, k, v)
+
     model.eval()
     return model
 
@@ -239,3 +250,12 @@ def call_fn_ignoring_unexpected_args(fn, *args, **kwargs):
         if k in existing_arguments:
             filtered_kwargs[k] = v
     return fn(*args, **filtered_kwargs)
+
+
+def set_seed(seed):
+    torch.backends.cudnn.deterministic = True
+    torch.backends.cudnn.benchmark = False
+    torch.manual_seed(seed)
+    torch.cuda.manual_seed_all(seed)
+    np.random.seed(seed)
+    random.seed(seed)

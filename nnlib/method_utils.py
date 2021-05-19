@@ -38,3 +38,6 @@ class Method(torch.nn.Module):
             if isinstance(v, torch.nn.Linear):
                 return v.weight.device
         raise Exception("Cannot find device")
+
+    def attributes_to_save(self):
+        return dict()
