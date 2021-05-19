@@ -127,7 +127,7 @@ def run_partition(model, epoch, tensorboard, optimizer, loader, partition, train
         # call on_iteration_end callbacks
         if hasattr(model, 'on_iteration_end'):
             model.on_iteration_end(outputs=outputs, batch_losses=batch_losses, batch_labels=batch_labels,
-                                   partition=partition, tensorboard=tensorboard)
+                                   partition=partition, tensorboard=tensorboard, loader=loader)
         for metric in metrics:
             metric.on_iteration_end(outputs=outputs, batch_labels=batch_labels, partition=partition)
 
