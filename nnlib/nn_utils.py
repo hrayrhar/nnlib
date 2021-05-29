@@ -237,3 +237,18 @@ def parse_network_from_config(args, input_shape):
 
     # parse feed forward
     return parse_feed_forward(args, input_shape)
+
+
+class StandardNetworkWrapper(torch.nn.Module):
+    """ Makes the output of a given model a dictionary with a single key
+    """
+    def __init__(self, model, output_name='pred'):
+        super(StandardNetworkWrapper, self).__init__()
+        self.model = model
+        self.output_name = output_name
+
+    def forward(self, *args, **kwargs):
+        ret = self.model.forward(*args, **kwargs)
+        return {
+            self.output_name: ret
+        }
