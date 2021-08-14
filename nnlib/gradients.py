@@ -4,6 +4,7 @@ import re
 from tqdm import tqdm
 from torch.utils.data import Subset, DataLoader
 import torch
+import numpy as np
 
 from . import utils
 
@@ -20,16 +21,22 @@ def get_hook(storage, key, cpu=True):
 
 def get_activation_gradients(model, dataset, batch_size=256, cpu=True, description="",
                              output_keys_regexp='.*', max_num_examples=2**30,
-                             num_workers=0, **kwargs):
-    model.eval()
+                             num_workers=0, use_eval_mode=True, random_selection=False, **kwargs):
+    if use_eval_mode:
+        model.eval()
 
     if num_workers > 0:
         torch.multiprocessing.set_sharing_strategy('file_system')
         torch.multiprocessing.set_start_method('spawn', force=True)
 
     n_examples = min(len(dataset), max_num_examples)
-    loader = DataLoader(dataset=Subset(dataset, range(n_examples)),
-                        batch_size=batch_size, shuffle=False,
+    if random_selection:
+        indices = np.random.choice(len(dataset), n_examples, replace=False)
+    else:
+        indices = range(n_examples)
+    loader = DataLoader(dataset=Subset(dataset, indices),
+                        batch_size=batch_size,
+                        shuffle=False,
                         num_workers=num_workers)
 
     activation_gradients = defaultdict(list)
@@ -70,15 +77,21 @@ def get_activation_gradients(model, dataset, batch_size=256, cpu=True, descripti
 
 
 def get_weight_gradients(model, dataset, cpu=True, description="", output_keys_regexp='.*',
-                         max_num_examples=2**30, num_workers=0, **kwargs):
-    model.eval()
+                         max_num_examples=2**30, num_workers=0, use_eval_mode=True,
+                         random_selection=False, **kwargs):
+    if use_eval_mode:
+        model.eval()
 
     if num_workers > 0:
         torch.multiprocessing.set_sharing_strategy('file_system')
         torch.multiprocessing.set_start_method('spawn', force=True)
 
     n_examples = min(len(dataset), max_num_examples)
-    loader = DataLoader(dataset=Subset(dataset, range(n_examples)),
+    if random_selection:
+        indices = np.random.choice(len(dataset), n_examples, replace=False)
+    else:
+        indices = range(n_examples)
+    loader = DataLoader(dataset=Subset(dataset, indices),
                         batch_size=1, shuffle=False, num_workers=num_workers)
 
     weight_gradients = defaultdict(list)
@@ -123,3 +136,4 @@ def get_weight_gradients(model, dataset, cpu=True, description="", output_keys_r
         assert len(weight_gradients[k]) == n_examples
 
     return weight_gradients
+
