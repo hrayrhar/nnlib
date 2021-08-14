@@ -319,3 +319,23 @@ class UniformNoiseWrapper(torch.utils.data.Dataset):
     def __getitem__(self, idx):
         x, y = self.dataset[idx]
         return x, self.ys[idx]
+
+
+class LabelMappingWrapper(torch.utils.data.Dataset):
+    def __init__(self, dataset, label_mapping_fn):
+        """
+        :param dataset: StandardVisionDataset or derivative class instance
+        """
+        super(LabelMappingWrapper, self).__init__()
+        self.dataset = dataset
+        self.label_mapping_fn = label_mapping_fn
+        # record important attributes
+        self.dataset_name = dataset.dataset_name
+        self.statistics = dataset.statistics
+
+    def __len__(self):
+        return len(self.dataset)
+
+    def __getitem__(self, idx):
+        x, y = self.dataset[idx]
+        return x, self.label_mapping_fn(y)
