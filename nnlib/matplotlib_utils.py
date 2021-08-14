@@ -24,7 +24,7 @@ def import_matplotlib(agg=True, use_style=True):
     import matplotlib
     import seaborn
     if agg:
-        matplotlib.use('agg', warn=False)
+        matplotlib.use('agg')
     from matplotlib import pyplot
     if use_style:
         set_default_configs(pyplot, seaborn)
