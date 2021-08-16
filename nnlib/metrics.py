@@ -66,23 +66,27 @@ class Accuracy(Metric):
         self._accuracy[partition][epoch] = accuracy
         tensorboard.add_scalar(f"metrics/{partition}_{self.name}", accuracy, epoch)
 
-    def on_iteration_end(self, outputs, batch_labels, partition, **kwargs):
-        out = outputs[self.output_key]
-        if out.shape[-1] > 1:
+    def compute_metric(self, preds, labels):
+        if preds.shape[-1] > 1:
             # multiple class
-            pred = utils.to_numpy(out).argmax(axis=1).astype(np.int)
+            pred = utils.to_numpy(preds).argmax(axis=1).astype(np.int)
         else:
             # binary classification
-            pred = utils.to_numpy(out.squeeze(dim=-1) > self.threshold).astype(np.int)
+            pred = utils.to_numpy(preds.squeeze(dim=-1) > self.threshold).astype(np.int)
             if self.plus_minus_one_binary:
                 pred = 2 * pred - 1
 
-        batch_labels = utils.to_numpy(batch_labels[0]).astype(np.int)
+        labels = utils.to_numpy(labels).astype(np.int)
         if self.one_hot:
-            batch_labels = np.argmax(batch_labels, axis=1)
+            labels = np.argmax(labels, axis=1)
         else:
-            batch_labels = batch_labels.reshape(pred.shape)
-        self._accuracy_storage[partition].append((pred == batch_labels).astype(np.float).mean())
+            labels = labels.reshape(pred.shape)
+        return (pred == labels).astype(np.float).mean()
+
+    def on_iteration_end(self, outputs, batch_labels, partition, **kwargs):
+        value = self.compute_metric(preds=outputs[self.output_key],
+                                    labels=batch_labels[0])
+        self._accuracy_storage[partition].append(value)
 
 
 class MulticlassScalarAccuracy(Metric):
