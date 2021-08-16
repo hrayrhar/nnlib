@@ -269,3 +269,9 @@ def set_seed(seed):
     torch.cuda.manual_seed_all(seed)
     np.random.seed(seed)
     random.seed(seed)
+
+
+class NestedDict(dict):
+    def __missing__(self, key):
+        self[key] = type(self)()
+        return self[key]
