@@ -33,6 +33,16 @@ def to_tensor(x, device='cpu', dtype=torch.float):
     return torch.tensor(x, dtype=dtype, device=device)
 
 
+def to_scalar(x):
+    if isinstance(x, torch.Tensor):
+        assert x.ndim == 0
+        return x.item()
+    if isinstance(x, np.ndarray):
+        assert x.ndim == 0
+        return x.item()
+    return x
+
+
 def to_cpu(x):
     if isinstance(x, torch.Tensor):
         return x.cpu()
