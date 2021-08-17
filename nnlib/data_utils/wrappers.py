@@ -212,7 +212,8 @@ class ResizeImagesWrapper(torch.utils.data.Dataset):
 
     def __getitem__(self, idx):
         x, y = self.dataset[idx]
-        x = F.interpolate(x.unsqueeze(dim=0), size=self.size, mode='bilinear')[0]
+        x = F.interpolate(x.unsqueeze(dim=0), size=self.size, mode='bilinear',
+                          align_corners=False)[0]
         return x, y
 
 
