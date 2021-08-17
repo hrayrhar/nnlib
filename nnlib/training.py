@@ -274,6 +274,12 @@ def train(model, train_loader, val_loader, epochs, save_iter=10, vis_iter=4,
             print(f"Finishing the training at epoch {epoch}...")
             break
 
+        # log the learning rate
+        last_lr = scheduler.get_last_lr()
+        if isinstance(last_lr, list):  # this happens when parameters are divided into groups
+            last_lr = last_lr[0]
+        tensorboard.add_scalar('hyper-parameters/lr', last_lr, epoch)
+
         # update the learning rate
         scheduler.step()
 
