@@ -5,7 +5,7 @@ from sklearn.metrics import roc_auc_score
 import numpy as np
 import torch
 
-from . import utils
+from .. import utils
 
 
 class Metric(ABC):

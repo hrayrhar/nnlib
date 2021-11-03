@@ -1,12 +1,12 @@
 from abc import ABC, abstractmethod
 import os
+import operator
 
 import numpy as np
 
-from . import utils
+from .. import utils
 from .metrics import Metric
 from numbers import Number
-import operator
 
 
 class Callback(ABC):
@@ -99,15 +99,15 @@ class StoppingWithOperatorApplyingOnMetric(Callback):
             metric: Metric,
             metric_target_value: Number,
             partition: str,
-            operator = operator.eq,
+            op=operator.eq,
             **kwargs
     ):
         super(StoppingWithOperatorApplyingOnMetric, self).__init__(**kwargs)
         self.metric = metric
         self.metric_target_value = metric_target_value
         self.partition = partition
-        self.operator = operator
+        self.op = op
 
     def call(self, epoch, **kwargs) -> bool:
         metric_curr_value = self.metric.value(partition=self.partition, epoch=epoch)
-        return self.operator(metric_curr_value, self.metric_target_value)
+        return self.op(metric_curr_value, self.metric_target_value)
