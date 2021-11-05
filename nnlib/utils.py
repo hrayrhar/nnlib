@@ -78,7 +78,9 @@ def save(model, path, optimizer=None, scheduler=None):
 
     save_dict = dict()
     save_dict['model'] = model.state_dict()
-    save_dict['args'] = model.args
+
+    if hasattr(model, 'args'):
+        save_dict['args'] = model.args
 
     # if the model has extra arguments or state variables to save
     if hasattr(model, 'attributes_to_save'):

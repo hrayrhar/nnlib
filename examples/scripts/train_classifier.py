@@ -9,6 +9,7 @@ from nnlib.data_utils.base import load_data_from_arguments
 
 from ..methods.standard_classifier import StandardClassifier
 
+
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('--config', '-c', type=str, required=True)
