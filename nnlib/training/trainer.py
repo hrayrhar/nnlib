@@ -196,11 +196,21 @@ class Trainer:
         self.optimizer.step()
 
     def _run_partition(self, epoch, loader, partition, is_training):
-        # call on_epoch_start callbacks
-        self.model.on_partition_start(epoch=epoch, tensorboard=self.tensorboard,
-                                      partition=partition, loader=loader)
+        # Build the context dictionary. This will be passed to on_*_[start|end] callbacks.
+        context = {
+            'epoch': epoch,
+            'loader': loader,
+            'dataset': loader.dataset,
+            'partition': partition,
+            'is_training': is_training,
+            'tensorboard': self.tensorboard,
+            'trainer': self
+        }
+
+        # call on_partition_start callbacks
+        self.model.on_partition_start(**context)
         for metric in self.metrics:
-            metric.on_partition_start(epoch=epoch, partition=partition)
+            metric.on_partition_start(**context)
 
         example_losses = defaultdict(list)
         current_step_idx = 0
@@ -219,14 +229,12 @@ class Trainer:
             # forward pass
             forward_model = (self.model if self.data_parallel_model is None else self.data_parallel_model)
             with torch.set_grad_enabled(is_training):
-                outputs = forward_model.forward(inputs=batch_data, labels=batch_labels, partition=partition,
-                                                grad_enabled=is_training, loader=loader, dataset=loader.dataset,
-                                                epoch=epoch)
+                outputs = forward_model.forward(inputs=batch_data, labels=batch_labels,
+                                                grad_enabled=is_training, **context)
 
                 batch_losses, outputs = self.model.compute_loss(inputs=batch_data, labels=batch_labels,
                                                                 outputs=outputs, grad_enabled=is_training,
-                                                                loader=loader, dataset=loader.dataset,
-                                                                epoch=epoch, partition=partition)
+                                                                **context)
                 batch_total_loss = sum([loss for name, loss in batch_losses.items()])
 
             if is_training:
@@ -239,9 +247,9 @@ class Trainer:
 
             # call on_iteration_end callbacks
             self.model.on_iteration_end(outputs=outputs, batch_losses=batch_losses, batch_labels=batch_labels,
-                                        partition=partition, tensorboard=self.tensorboard, loader=loader)
+                                        **context)
             for metric in self.metrics:
-                metric.on_iteration_end(outputs=outputs, batch_labels=batch_labels, partition=partition)
+                metric.on_iteration_end(outputs=outputs, batch_labels=batch_labels, **context)
 
             # collect all losses
             if len(batch_losses) > 1:
@@ -263,11 +271,10 @@ class Trainer:
                             'number of accumulation steps')
             self._apply_weight_update()
 
-        # call on_epoch_end callbacks
-        if hasattr(self.model, 'on_epoch_end'):
-            self.model.on_partition_end(epoch=epoch, tensorboard=self.tensorboard, partition=partition, loader=loader)
+        # call on_partition_end callbacks
+        self.model.on_partition_end(**context)
         for metric in self.metrics:
-            metric.on_partition_end(epoch=epoch, tensorboard=self.tensorboard, partition=partition)
+            metric.on_partition_end(**context)
 
         return avg_losses
 
@@ -306,7 +313,7 @@ class Trainer:
             print(log_string)
 
             # add visualizations
-            if (epoch + 1) % self.vis_iter == 0 and hasattr(self.model, 'visualize'):
+            if (epoch + 1) % self.vis_iter == 0:
                 visualizations = self.model.visualize(self.train_loader, self.val_loader,
                                                       tensorboard=self.tensorboard, epoch=epoch)
                 # visualizations is a dictionary containing figures in (name, fig) format.
@@ -346,9 +353,8 @@ class Trainer:
                    path=os.path.join(self.log_dir, 'checkpoints', 'final.mdl'))
 
         # do final visualizations
-        if hasattr(self.model, 'visualize'):
-            visualizations = self.model.visualize(self.train_loader, self.val_loader,
-                                                  tensorboard=self.tensorboard, epoch=self.n_epochs)
-            for (name, fig) in visualizations.items():
-                self.tensorboard.add_figure(name, fig, self.n_epochs)
-                vis.savefig(fig, os.path.join(self.log_dir, name, 'final.png'))
+        visualizations = self.model.visualize(self.train_loader, self.val_loader,
+                                              tensorboard=self.tensorboard, epoch=self.n_epochs)
+        for (name, fig) in visualizations.items():
+            self.tensorboard.add_figure(name, fig, self.n_epochs)
+            vis.savefig(fig, os.path.join(self.log_dir, name, 'final.png'))
