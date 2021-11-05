@@ -1,3 +1,4 @@
+from typing import Tuple
 from abc import ABC, abstractmethod
 
 import torch
@@ -22,14 +23,14 @@ class Method(torch.nn.Module, ABC):
         pass
 
     @abstractmethod
-    def forward(self, *args, **kwargs):
+    def forward(self, *args, **kwargs) -> dict:
         pass
 
     @abstractmethod
-    def compute_loss(self, *args, **kwargs):
+    def compute_loss(self, *args, **kwargs) -> Tuple[dict, dict]:
         pass
 
-    def visualize(self, *args, **kwargs):
+    def visualize(self, *args, **kwargs) -> dict:
         return {}
 
     @property
@@ -44,5 +45,5 @@ class Method(torch.nn.Module, ABC):
         raise Exception("Cannot find device")
 
     @property
-    def attributes_to_save(self):
+    def attributes_to_save(self) -> dict:
         return dict()

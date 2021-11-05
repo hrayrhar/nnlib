@@ -1,3 +1,6 @@
+from abc import ABC
+from typing import Tuple
+
 import torch
 import torch.nn.functional as F
 import torch.autograd
@@ -9,13 +12,13 @@ from nnlib import visualizations as vis
 from nnlib.method_utils import Method
 
 
-class BaseClassifier(Method):
+class BaseClassifier(Method, ABC):
     """ Abstract class for classifiers.
     """
     def __init__(self, **kwargs):
         super(BaseClassifier, self).__init__(**kwargs)
 
-    def visualize(self, train_loader, val_loader, **kwargs):
+    def visualize(self, train_loader, val_loader, **kwargs) -> dict:
         visualizations = {}
 
         # visualize pred
@@ -43,7 +46,7 @@ class StandardClassifier(BaseClassifier):
         self.num_classes = output_shape[-1]
         self.classifier = self.classifier.to(device)
 
-    def forward(self, inputs, labels=None, grad_enabled=False, **kwargs):
+    def forward(self, inputs, labels=None, grad_enabled=False, **kwargs) -> dict:
         torch.set_grad_enabled(grad_enabled)
 
         x = inputs[0].to(self.device)
@@ -56,7 +59,7 @@ class StandardClassifier(BaseClassifier):
 
         return out
 
-    def compute_loss(self, inputs, labels, outputs, grad_enabled, **kwargs):
+    def compute_loss(self, inputs, labels, outputs, grad_enabled, **kwargs) -> Tuple[dict, dict]:
         torch.set_grad_enabled(grad_enabled)
 
         pred = outputs['pred']
