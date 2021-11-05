@@ -1,7 +1,9 @@
+from abc import ABC, abstractmethod
+
 import torch
 
 
-class Method(torch.nn.Module):
+class Method(torch.nn.Module, ABC):
     """ Abstract class for methods.
     """
     def __init__(self, **kwargs):
@@ -19,11 +21,13 @@ class Method(torch.nn.Module):
     def before_weight_update(self, **kwargs):
         pass
 
+    @abstractmethod
     def forward(self, *args, **kwargs):
-        raise NotImplementedError("Forward is not implemented")
+        pass
 
+    @abstractmethod
     def compute_loss(self, *args, **kwargs):
-        raise NotImplementedError("Compute loss is not implemented")
+        pass
 
     def visualize(self, *args, **kwargs):
         return {}
@@ -39,5 +43,6 @@ class Method(torch.nn.Module):
                 return v.weight.device
         raise Exception("Cannot find device")
 
+    @property
     def attributes_to_save(self):
         return dict()

@@ -82,7 +82,7 @@ def save(model, path, optimizer=None, scheduler=None):
 
     # if the model has extra arguments or state variables to save
     if hasattr(model, 'attributes_to_save'):
-        save_dict['model_attr'] = model.attributes_to_save()
+        save_dict['model_attr'] = model.attributes_to_save
 
     if optimizer is not None:
         save_dict['optimizer'] = optimizer.state_dict()
