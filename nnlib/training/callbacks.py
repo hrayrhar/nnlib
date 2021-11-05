@@ -7,21 +7,11 @@ from .. import utils
 from .metrics import Metric
 
 
-class Callback(ABC):
+class Callback:
     def __init__(self, **kwargs):
         pass
 
-    def on_epoch_start(self, *args, **kwargs):
-        pass
-
     def on_epoch_end(self, *args, **kwargs):
-        pass
-
-    def on_iteration_end(self, *args, **kwargs):
-        pass
-
-    @abstractmethod
-    def call(self, *args, **kwargs):
         pass
 
 
@@ -43,7 +33,7 @@ class SaveBestWithMetric(Callback):
         else:
             self._best_result_so_far = +np.inf
 
-    def call(self, epoch, model, optimizer, scheduler, log_dir, **kwargs):
+    def on_epoch_end(self, epoch, model, optimizer, scheduler, log_dir, **kwargs):
         result = self.metric.value(partition=self.partition, epoch=epoch)
 
         update = (self.direction == 'max' and result > self._best_result_so_far) or \
@@ -60,7 +50,16 @@ class SaveBestWithMetric(Callback):
                 f.write(f"{result}\n")
 
 
-class EarlyStoppingWithMetric(Callback):
+class Stopper(ABC):
+    def __init__(self, **kwargs):
+        super(Stopper, self).__init__(**kwargs)
+
+    @abstractmethod
+    def is_stopping_time(self, *args, **kwargs) -> bool:
+        pass
+
+
+class EarlyStoppingWithMetric(Stopper):
     def __init__(self,
                  metric: Metric,
                  stopping_param: int = 50,
@@ -82,7 +81,7 @@ class EarlyStoppingWithMetric(Callback):
 
         self._best_result_epoch = -1
 
-    def call(self, epoch, **kwargs) -> bool:
+    def is_stopping_time(self, epoch, **kwargs) -> bool:
         """ Checks whether the training should be finished. Returning True corresponds to finishing. """
         result = self.metric.value(partition=self.partition, epoch=epoch)
 

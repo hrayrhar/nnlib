@@ -13,7 +13,7 @@ import torch.utils.data
 import numpy as np
 import torch
 
-from .callbacks import Callback
+from .callbacks import Callback, Stopper
 from .metrics import Metric
 from ..method_utils import Method
 from .. import visualizations as vis
@@ -94,7 +94,7 @@ class Trainer:
                  args_to_log=None,
                  metrics: Optional[Union[List[Metric], Tuple[Metric]]] = None,
                  callbacks: Optional[Union[List[Callback], Tuple[Callback]]] = None,
-                 stopper: Optional[Callback] = None,
+                 stopper: Optional[Stopper] = None,
                  device_ids: Optional[Union[list, tuple]] = None,
                  num_accumulation_steps: int = 1,
                  grad_clip_norm: Optional[Union[float, int]] = None):
@@ -115,7 +115,7 @@ class Trainer:
         :param args_to_log: A namespace of arguments to log in tensorboard and save in the log dir.
         :param metrics: A list of Metric instances used for evaluating the model during the training.
         :param callbacks: A list of Callback instances used for saving best models, logging, etc.
-        :param stopper: A Callback instance used for stopping the training.
+        :param stopper: A Stopper instance used for stopping the training.
         :param device_ids: list of device ids to be used during the training. If there are at least two devices,
                            distributed data training will be used via torch.nn.DataParallel. Note that PyTorch
                            requires and we rely on the fact that the first device should match with model.device.
@@ -187,8 +187,7 @@ class Trainer:
     def _apply_weight_update(self):
         # some models might need to do something before applying gradients (e.g. adding noise)
         # TODO: if data parallelism is on, each model should call its before_weight_update
-        if hasattr(self.model, 'before_weight_update'):
-            self.model.before_weight_update()
+        self.model.before_weight_update()
 
         # clip the gradients if needed
         if self.grad_clip_norm is not None:
@@ -198,11 +197,10 @@ class Trainer:
 
     def _run_partition(self, epoch, loader, partition, is_training):
         # call on_epoch_start callbacks
-        if hasattr(self.model, 'on_epoch_start'):
-            self.model.on_epoch_start(epoch=epoch, tensorboard=self.tensorboard,
+        self.model.on_partition_start(epoch=epoch, tensorboard=self.tensorboard,
                                       partition=partition, loader=loader)
         for metric in self.metrics:
-            metric.on_epoch_start(epoch=epoch, partition=partition)
+            metric.on_partition_start(epoch=epoch, partition=partition)
 
         example_losses = defaultdict(list)
         current_step_idx = 0
@@ -240,9 +238,8 @@ class Trainer:
                     self._apply_weight_update()
 
             # call on_iteration_end callbacks
-            if hasattr(self.model, 'on_iteration_end'):
-                self.model.on_iteration_end(outputs=outputs, batch_losses=batch_losses, batch_labels=batch_labels,
-                                            partition=partition, tensorboard=self.tensorboard, loader=loader)
+            self.model.on_iteration_end(outputs=outputs, batch_losses=batch_losses, batch_labels=batch_labels,
+                                        partition=partition, tensorboard=self.tensorboard, loader=loader)
             for metric in self.metrics:
                 metric.on_iteration_end(outputs=outputs, batch_labels=batch_labels, partition=partition)
 
@@ -268,9 +265,9 @@ class Trainer:
 
         # call on_epoch_end callbacks
         if hasattr(self.model, 'on_epoch_end'):
-            self.model.on_epoch_end(epoch=epoch, tensorboard=self.tensorboard, partition=partition, loader=loader)
+            self.model.on_partition_end(epoch=epoch, tensorboard=self.tensorboard, partition=partition, loader=loader)
         for metric in self.metrics:
-            metric.on_epoch_end(epoch=epoch, tensorboard=self.tensorboard, partition=partition)
+            metric.on_partition_end(epoch=epoch, tensorboard=self.tensorboard, partition=partition)
 
         return avg_losses
 
@@ -322,13 +319,13 @@ class Trainer:
                 utils.save(model=self.model, optimizer=self.optimizer, scheduler=self.scheduler,
                            path=os.path.join(self.log_dir, 'checkpoints', 'epoch{}.mdl'.format(epoch)))
 
-            # Call callbacks. These can be used to save the best model so far or initiate testing.
+            # call callbacks. These can be used to save the best model so far or initiate testing.
             for callback in self.callbacks:
-                callback.call(epoch=epoch, model=self.model, optimizer=self.optimizer,
-                              scheduler=self.scheduler, log_dir=self.log_dir)
+                callback.on_epoch_end(epoch=epoch, model=self.model, optimizer=self.optimizer,
+                                      scheduler=self.scheduler, log_dir=self.log_dir)
 
             # check whether the training should be ended
-            if (self.stopper is not None) and self.stopper.call(epoch=epoch):
+            if (self.stopper is not None) and self.stopper.is_stopping_time(epoch=epoch):
                 print(f"Finishing the training at epoch {epoch}...")
                 break
 

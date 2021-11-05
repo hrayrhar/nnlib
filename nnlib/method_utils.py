@@ -9,13 +9,13 @@ class Method(torch.nn.Module, ABC):
     def __init__(self, **kwargs):
         super(Method, self).__init__()
 
-    def on_epoch_start(self, *args, **kwargs):
+    def on_partition_start(self, *args, **kwargs):
         pass
 
     def on_iteration_end(self, *args, **kwargs):
         pass
 
-    def on_epoch_end(self, *args, **kwargs):
+    def on_partition_end(self, *args, **kwargs):
         pass
 
     def before_weight_update(self, **kwargs):

@@ -21,15 +21,12 @@ class Metric(ABC):
     def value(self, *args, **kwargs):
         pass
 
-    @abstractmethod
-    def on_epoch_start(self, *args, **kwargs):
+    def on_partition_start(self, *args, **kwargs):
         pass
 
-    @abstractmethod
-    def on_epoch_end(self, *args, **kwargs):
+    def on_partition_end(self, *args, **kwargs):
         pass
 
-    @abstractmethod
     def on_iteration_end(self, *args, **kwargs):
         pass
 
@@ -74,10 +71,10 @@ class Accuracy(MetricWithStorage):
     def name(self) -> str:
         return "accuracy"
 
-    def on_epoch_start(self, partition, **kwargs):
+    def on_partition_start(self, partition, **kwargs):
         self._iter_accuracies[partition] = []
 
-    def on_epoch_end(self, partition, epoch, tensorboard, **kwargs):
+    def on_partition_end(self, partition, epoch, tensorboard, **kwargs):
         accuracy = np.mean(self._iter_accuracies[partition])
         self._store(partition=partition, epoch=epoch, value=accuracy)
         tensorboard.add_scalar(f"metrics/{partition}_{self.name}", accuracy, epoch)
@@ -119,10 +116,10 @@ class MulticlassScalarAccuracy(MetricWithStorage):
     def name(self) -> str:
         return "accuracy"
 
-    def on_epoch_start(self, partition, **kwargs):
+    def on_partition_start(self, partition, **kwargs):
         self._iter_accuracies[partition] = []
 
-    def on_epoch_end(self, partition, epoch, tensorboard, **kwargs):
+    def on_partition_end(self, partition, epoch, tensorboard, **kwargs):
         accuracy = np.mean(self._iter_accuracies[partition])
         self._store(partition=partition, epoch=epoch, value=accuracy)
         tensorboard.add_scalar(f"metrics/{partition}_{self.name}", accuracy, epoch)
@@ -150,11 +147,11 @@ class ROCAUC(MetricWithStorage):
     def name(self) -> str:
         return "ROC AUC"
 
-    def on_epoch_start(self, partition, **kwargs):
+    def on_partition_start(self, partition, **kwargs):
         self._score_storage[partition] = []
         self._label_storage[partition] = []
 
-    def on_epoch_end(self, partition, epoch, tensorboard, **kwargs):
+    def on_partition_end(self, partition, epoch, tensorboard, **kwargs):
         labels = torch.cat(self._label_storage[partition], dim=0)
         scores = torch.cat(self._score_storage[partition], dim=0)
         auc = roc_auc_score(y_true=utils.to_numpy(labels), y_score=utils.to_numpy(scores))
@@ -181,10 +178,10 @@ class TopKAccuracy(MetricWithStorage):
     def name(self) -> str:
         return f"top{self.k}_accuracy"
 
-    def on_epoch_start(self, partition, **kwargs):
+    def on_partition_start(self, partition, **kwargs):
         self._iter_accuracies[partition] = []
 
-    def on_epoch_end(self, partition, epoch, tensorboard, **kwargs):
+    def on_partition_end(self, partition, epoch, tensorboard, **kwargs):
         accuracy = np.mean(self._iter_accuracies[partition])
         self._store(partition=partition, epoch=epoch, value=accuracy)
         tensorboard.add_scalar(f"metrics/{partition}_{self.name}", accuracy, epoch)
