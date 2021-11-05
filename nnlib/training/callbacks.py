@@ -1,12 +1,10 @@
 from abc import ABC, abstractmethod
 import os
-import operator
 
 import numpy as np
 
 from .. import utils
 from .metrics import Metric
-from numbers import Number
 
 
 class Callback(ABC):
@@ -24,11 +22,16 @@ class Callback(ABC):
 
     @abstractmethod
     def call(self, *args, **kwargs):
-        raise NotImplementedError("Function call is not implemented")
+        pass
 
 
 class SaveBestWithMetric(Callback):
-    def __init__(self, metric, partition='val', direction='max', **kwargs):
+    def __init__(self,
+                 metric: Metric,
+                 partition: str = 'val',
+                 direction: str = 'max',
+                 **kwargs):
+
         assert direction in ['min', 'max']
         super(SaveBestWithMetric, self).__init__(**kwargs)
         self.metric = metric
@@ -42,9 +45,6 @@ class SaveBestWithMetric(Callback):
 
     def call(self, epoch, model, optimizer, scheduler, log_dir, **kwargs):
         result = self.metric.value(partition=self.partition, epoch=epoch)
-        if result is None:
-            raise ValueError(f"Metric {self.metric.name} returned none for partition "
-                             f"{self.partition} at epoch {epoch}")
 
         update = (self.direction == 'max' and result > self._best_result_so_far) or \
                  (self.direction == 'min' and result < self._best_result_so_far)
@@ -61,7 +61,13 @@ class SaveBestWithMetric(Callback):
 
 
 class EarlyStoppingWithMetric(Callback):
-    def __init__(self, metric, stopping_param=50, partition='val', direction='max', **kwargs):
+    def __init__(self,
+                 metric: Metric,
+                 stopping_param: int = 50,
+                 partition: str = 'val',
+                 direction: str = 'max',
+                 **kwargs):
+
         assert direction in ['min', 'max']
         super(EarlyStoppingWithMetric, self).__init__(**kwargs)
         self.metric = metric
@@ -79,9 +85,6 @@ class EarlyStoppingWithMetric(Callback):
     def call(self, epoch, **kwargs) -> bool:
         """ Checks whether the training should be finished. Returning True corresponds to finishing. """
         result = self.metric.value(partition=self.partition, epoch=epoch)
-        if result is None:
-            raise ValueError(f"Metric {self.metric.name} returned none for partition "
-                             f"{self.partition} at epoch {epoch}")
 
         update = (self.direction == 'max' and result > self._best_result_so_far) or \
                  (self.direction == 'min' and result < self._best_result_so_far)
@@ -91,23 +94,3 @@ class EarlyStoppingWithMetric(Callback):
             self._best_result_epoch = epoch
 
         return epoch - self._best_result_epoch > self.stopping_param
-
-
-class StoppingWithOperatorApplyingOnMetric(Callback):
-    def __init__(
-            self,
-            metric: Metric,
-            metric_target_value: Number,
-            partition: str,
-            op=operator.eq,
-            **kwargs
-    ):
-        super(StoppingWithOperatorApplyingOnMetric, self).__init__(**kwargs)
-        self.metric = metric
-        self.metric_target_value = metric_target_value
-        self.partition = partition
-        self.op = op
-
-    def call(self, epoch, **kwargs) -> bool:
-        metric_curr_value = self.metric.value(partition=self.partition, epoch=epoch)
-        return self.op(metric_curr_value, self.metric_target_value)
