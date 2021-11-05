@@ -11,6 +11,8 @@ from tqdm import tqdm
 import torch
 import numpy as np
 
+from .method_utils import Method
+
 
 def make_path(path):
     if not os.path.exists(path):
@@ -133,9 +135,15 @@ def with_no_grad(init_fn):
 
 
 @with_no_grad
-def apply_on_dataset(model, dataset, batch_size=256, cpu=True, description="",
-                     output_keys_regexp='.*', max_num_examples=2**30,
-                     num_workers=0, **kwargs):
+def apply_on_dataset(model: Method,
+                     dataset: torch.utils.data.Dataset,
+                     batch_size: int = 256,
+                     cpu: bool = True,
+                     description: str = "",
+                     output_keys_regexp: str = '.*',
+                     max_num_examples: int = 2**30,
+                     num_workers: int = 0,
+                     **kwargs):
     model.eval()
 
     if num_workers > 0:
