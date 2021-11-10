@@ -285,3 +285,19 @@ class NestedDict(dict):
     def __missing__(self, key):
         self[key] = type(self)()
         return self[key]
+
+
+def loop_over_hparam_grid(grid: dict, current_setting: Optional[list] = None):
+    if current_setting is None:
+        current_setting = []
+    grid = copy(grid)
+    keys = list(grid.keys())
+    if len(keys) == 0:
+        yield current_setting
+    else:
+        next_key = keys[0]
+        values = grid.pop(next_key)
+        for v in values:
+            next_setting = copy(current_setting)
+            next_setting.append((next_key, v))
+            yield from loop_over_hparam_grid(grid, next_setting)
