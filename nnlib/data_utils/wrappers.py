@@ -8,6 +8,28 @@ import torch.utils.data
 import torch.nn.functional as F
 
 
+class StandardImageDatasetWrapper(torch.utils.data.Dataset):
+    """ Takes a standard image dataset and makes it compatible with nnlib.
+    """
+    def __init__(self, dataset, name='none', statistics=None):
+        super(StandardImageDatasetWrapper, self).__init__()
+        self.dataset = dataset
+
+        # record important attributes
+        self.dataset_name = name
+        if statistics is None:
+            self.statistics = (torch.tensor([0.485, 0.456, 0.406]),
+                               torch.tensor([0.229, 0.224, 0.225]))
+        else:
+            self.statistics = statistics
+
+    def __len__(self):
+        return len(self.dataset)
+
+    def __getitem__(self, idx):
+        return self.dataset[idx]
+
+
 class TwoAugmentationWrapper(torch.utils.data.Dataset):
     """ Takes a dataset instance and creates another dataset which returns two data augmentations per example.
     """
