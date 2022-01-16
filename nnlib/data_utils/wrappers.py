@@ -10,6 +10,7 @@ import torch.nn.functional as F
 
 class StandardImageDatasetWrapper(torch.utils.data.Dataset):
     """ Takes a standard image dataset and makes it compatible with nnlib.
+    Note that it is assumes that dataset has 2 outputs in (x, y) form.
     """
     def __init__(self, dataset, name='none', statistics=None):
         super(StandardImageDatasetWrapper, self).__init__()
@@ -27,7 +28,9 @@ class StandardImageDatasetWrapper(torch.utils.data.Dataset):
         return len(self.dataset)
 
     def __getitem__(self, idx):
-        return self.dataset[idx]
+        ret = self.dataset[idx]
+        assert len(ret) >= 2, "The dataset must return at least two objects -- input and label"
+        return self.dataset[idx][:2]
 
 
 class TwoAugmentationWrapper(torch.utils.data.Dataset):
