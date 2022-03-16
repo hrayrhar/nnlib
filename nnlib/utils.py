@@ -209,7 +209,12 @@ def capture_arguments_of_init(init_fn):
         argument_dict['class'] = self.__class__.__name__
 
         # write it in self
-        self.args = argument_dict
+        if hasattr(self, "args"):
+            assert isinstance(self.args, dict)
+            for k, v in argument_dict.items():
+                self.args[k] = v
+        else:
+            self.args = argument_dict
 
     return wrapper
 
