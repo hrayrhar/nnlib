@@ -210,6 +210,8 @@ def capture_arguments_of_init(init_fn):
 
         # write it in self
         if hasattr(self, "args"):
+            if self.args is None:
+                self.args = dict()
             assert isinstance(self.args, dict)
             for k, v in argument_dict.items():
                 self.args[k] = v
