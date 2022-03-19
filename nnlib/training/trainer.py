@@ -184,7 +184,9 @@ class Trainer:
             print(f"Using multiple GPUs: {device_ids}")
             self.data_parallel_model = torch.nn.DataParallel(model, device_ids=device_ids)
 
-    def _apply_weight_update(self, epoch):
+        self._update_iteration = 0  # this will be updated at each gradient update
+
+    def _apply_weight_update(self):
         # some models might need to do something before applying gradients (e.g. adding noise)
         # TODO: if data parallelism is on, each model should call its before_weight_update
         self.model.before_weight_update()
@@ -194,7 +196,9 @@ class Trainer:
             if param.grad is None:
                 continue
             norm = utils.to_numpy(torch.norm(param.grad.detach()))
-            self.tensorboard.add_scalar(f"gradient-norms/{name}", norm, epoch)
+            self.tensorboard.add_scalar(f"gradient-norms/{name}", norm, self._update_iteration)
+
+        self._update_iteration += 1
 
         # clip the gradients if needed
         if self.grad_clip_norm is not None:
@@ -250,7 +254,7 @@ class Trainer:
 
                 # update the parameters
                 if current_step_idx == self.num_accumulation_steps - 1:
-                    self._apply_weight_update(epoch)
+                    self._apply_weight_update()
 
             # call on_iteration_end callbacks
             self.model.on_iteration_end(outputs=outputs, batch_losses=batch_losses, batch_labels=batch_labels,
@@ -276,7 +280,7 @@ class Trainer:
         if is_training and current_step_idx > 0:
             logging.warning('The number of training steps in one epoch is not a multiple of '
                             'number of accumulation steps')
-            self._apply_weight_update(epoch)
+            self._apply_weight_update()
 
         # call on_partition_end callbacks
         self.model.on_partition_end(**context)
