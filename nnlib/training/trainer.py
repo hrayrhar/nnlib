@@ -195,8 +195,7 @@ class Trainer:
         self.model.before_weight_update()
 
         # log gradient norms
-        if (self._update_iteration % self.log_gradient_norms_freq == 0 and
-                self._update_iteration / self.log_gradient_norms_freq < 1000):
+        if self._update_iteration % self.log_gradient_norms_freq == 0:
             total_norm = 0
             total_n_elems = 0
             for name, param in self.model.named_parameters():
@@ -205,8 +204,9 @@ class Trainer:
                 norm = utils.to_numpy(torch.norm(param.grad.detach()))
                 total_norm += (norm**2) * param.grad.numel()
                 total_n_elems += param.grad.numel()
-                self.tensorboard.add_scalar(f"gradient-norms/{name}", norm, self._update_iteration)
-            if total_n_elems > 0:
+                if self._update_iteration / self.log_gradient_norms_freq < 100:
+                    self.tensorboard.add_scalar(f"gradient-norms/{name}", norm, self._update_iteration)
+            if total_n_elems > 0 and self._update_iteration / self.log_gradient_norms_freq < 1000:
                 total_norm = np.sqrt(total_norm / total_n_elems)
                 self.tensorboard.add_scalar(f"gradient-norms/total-norm", total_norm, self._update_iteration)
 
