@@ -97,7 +97,8 @@ class Trainer:
                  stopper: Optional[Stopper] = None,
                  device_ids: Optional[Union[list, tuple]] = None,
                  num_accumulation_steps: int = 1,
-                 grad_clip_norm: Optional[Union[float, int]] = None):
+                 grad_clip_norm: Optional[Union[float, int]] = None,
+                 log_gradient_norms_freq: int = 10):
         """
         :param model: The model to train.
         :param train_loader: Loader of getting the training data.
@@ -121,6 +122,7 @@ class Trainer:
                            requires and we rely on the fact that the first device should match with model.device.
         :param num_accumulation_steps: how many steps gradients should be averaged before updating the parameters.
         :param grad_clip_norm: used for clipping the gradients.
+        :param log_gradient_norms_freq: the frequency (in iterations) of logging gradient norms.
 
         :Assumptions:
             1. loaders return (batch_inputs, batch_labels), where both can be lists or torch.Tensors
@@ -178,6 +180,7 @@ class Trainer:
         self.device_ids = device_ids
         self.num_accumulation_steps = num_accumulation_steps
         self.grad_clip_norm = grad_clip_norm
+        self.log_gradient_norms_freq = log_gradient_norms_freq
 
         self.data_parallel_model = None
         if (device_ids is not None) and len(device_ids) >= 2:
@@ -192,11 +195,19 @@ class Trainer:
         self.model.before_weight_update()
 
         # log gradient norms
-        for name, param in self.model.named_parameters():
-            if param.grad is None:
-                continue
-            norm = utils.to_numpy(torch.norm(param.grad.detach()))
-            self.tensorboard.add_scalar(f"gradient-norms/{name}", norm, self._update_iteration)
+        if self._update_iteration % self.log_gradient_norms_freq == 0:
+            total_norm = 0
+            total_n_elems = 0
+            for name, param in self.model.named_parameters():
+                if param.grad is None:
+                    continue
+                norm = utils.to_numpy(torch.norm(param.grad.detach()))
+                total_norm += (norm**2) * param.grad.numel()
+                total_n_elems += param.grad.numel()
+                self.tensorboard.add_scalar(f"gradient-norms/{name}", norm, self._update_iteration)
+            if total_n_elems > 0:
+                total_norm = np.sqrt(total_norm / total_n_elems)
+                self.tensorboard.add_scalar(f"gradient-norms/total-norm", total_norm, self._update_iteration)
 
         self._update_iteration += 1
 
