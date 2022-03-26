@@ -214,7 +214,7 @@ class Trainer:
 
         # clip the gradients if needed
         if self.grad_clip_norm is not None:
-            torch.nn.utils.clip_grad_norm(self.model.parameters(), max_norm=self.grad_clip_norm)
+            torch.nn.utils.clip_grad_norm_(self.model.parameters(), max_norm=self.grad_clip_norm)
 
         self.optimizer.step()
 
