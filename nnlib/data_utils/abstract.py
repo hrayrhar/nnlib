@@ -62,6 +62,11 @@ class StandardVisionDataset(ABC):
                        seed: int = 42, download: bool = True, **kwargs):
         """ Builds train, validation, and test datasets. """
         if data_dir is None:
+            if 'DATA_DIR' not in os.environ:
+                raise EnvironmentError('Please make an environment variable called DATA_DIR pointing to '
+                                       'the directory where datasets should be kept. This can be done by '
+                                       'adding the following line to the .zshrc or .bashrc file (depending on '
+                                       'which shell is used):\n\n\texport DATA_DIR="~/data"')
             data_dir = os.path.join(os.environ['DATA_DIR'], self.dataset_name)
 
         train_data = self.raw_dataset(data_dir, download=download, split='train', transform=self.train_transforms)
