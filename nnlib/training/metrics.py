@@ -1,7 +1,7 @@
 from abc import ABC, abstractmethod
 from collections import defaultdict
 
-from sklearn.metrics import roc_auc_score
+import sklearn.metrics as sk_metrics
 import numpy as np
 import torch
 
@@ -154,7 +154,11 @@ class ROCAUC(MetricWithStorage):
     def on_partition_end(self, partition, epoch, tensorboard, **kwargs):
         labels = torch.cat(self._label_storage[partition], dim=0)
         scores = torch.cat(self._score_storage[partition], dim=0)
-        auc = roc_auc_score(y_true=utils.to_numpy(labels), y_score=utils.to_numpy(scores))
+        try:
+            auc = sk_metrics.roc_auc_score(y_true=utils.to_numpy(labels),
+                                           y_score=utils.to_numpy(scores))
+        except ValueError:
+            auc = np.nan
         self._store(partition=partition, epoch=epoch, value=auc)
         tensorboard.add_scalar(f"metrics/{partition}_{self.name}", auc, epoch)
 
@@ -195,3 +199,214 @@ class TopKAccuracy(MetricWithStorage):
         topk_correctness = (np.sum(topk_predictions == batch_labels, axis=1) >= 1)
 
         self._iter_accuracies[partition].append(topk_correctness.astype(np.float).mean())
+
+
+class F1Score(MetricWithStorage):
+    """ F1 score for binary classification setting.
+    """
+    def __init__(self, threshold: float = 0.5, output_key: str = 'pred', **kwargs):
+        super(F1Score, self).__init__(**kwargs)
+        self.threshold = threshold
+        self.output_key = output_key
+
+        # initialize and use later
+        self._score_storage = defaultdict(list)
+        self._label_storage = defaultdict(list)
+
+    @property
+    def name(self) -> str:
+        return "F1"
+
+    def on_partition_start(self, partition, **kwargs):
+        self._score_storage[partition] = []
+        self._label_storage[partition] = []
+
+    def on_partition_end(self, partition, epoch, tensorboard, **kwargs):
+        labels = torch.cat(self._label_storage[partition], dim=0)
+        scores = torch.cat(self._score_storage[partition], dim=0)
+
+        f1 = sk_metrics.f1_score(y_true=utils.to_numpy(labels),
+                                 y_pred=utils.to_numpy(scores),
+                                 zero_division=0)
+        self._store(partition=partition, epoch=epoch, value=f1)
+        tensorboard.add_scalar(f"metrics/{partition}_{self.name}", f1, epoch)
+
+    def on_iteration_end(self, outputs, batch_labels, partition, **kwargs):
+        pred = outputs[self.output_key]
+        assert pred.shape[-1] == 1
+        self._score_storage[partition].append((pred.squeeze(dim=-1) > self.threshold).long())
+        self._label_storage[partition].append(batch_labels[0])
+
+
+class PRCAUC(MetricWithStorage):
+    """ PRC AUC for binary classification setting.
+    """
+    def __init__(self, output_key: str = 'pred', **kwargs):
+        super(PRCAUC, self).__init__(**kwargs)
+        self.output_key = output_key
+
+        # initialize and use later
+        self._score_storage = defaultdict(list)
+        self._label_storage = defaultdict(list)
+
+    @property
+    def name(self) -> str:
+        return "PRC AUC"
+
+    def on_partition_start(self, partition, **kwargs):
+        self._score_storage[partition] = []
+        self._label_storage[partition] = []
+
+    def on_partition_end(self, partition, epoch, tensorboard, **kwargs):
+        labels = torch.cat(self._label_storage[partition], dim=0)
+        scores = torch.cat(self._score_storage[partition], dim=0)
+
+        (precisions, recalls, thresholds) = sk_metrics.precision_recall_curve(y_true=utils.to_numpy(labels),
+                                                                              probas_pred=utils.to_numpy(scores))
+        try:
+            auc = sk_metrics.auc(recalls, precisions)
+        except ValueError:
+            auc = np.nan
+        self._store(partition=partition, epoch=epoch, value=auc)
+        tensorboard.add_scalar(f"metrics/{partition}_{self.name}", auc, epoch)
+
+    def on_iteration_end(self, outputs, batch_labels, partition, **kwargs):
+        pred = outputs[self.output_key]
+        assert pred.shape[-1] == 1
+        self._score_storage[partition].append(pred.squeeze(dim=-1))
+        self._label_storage[partition].append(batch_labels[0])
+
+
+class MacroF1Score(MetricWithStorage):
+    """ Macro averaged F1 score for multiclass classification setting.
+    """
+    def __init__(self, num_classes: int, threshold: float = 0.5, output_key: str = 'pred', **kwargs):
+        super(MacroF1Score, self).__init__(**kwargs)
+        self.num_classes = num_classes
+        self.threshold = threshold
+        self.output_key = output_key
+
+        # initialize and use later
+        self._probs_storage = defaultdict(list)
+        self._label_storage = defaultdict(list)
+
+    @property
+    def name(self) -> str:
+        return "Macro F1"
+
+    def on_partition_start(self, partition, **kwargs):
+        self._probs_storage[partition] = []
+        self._label_storage[partition] = []
+
+    def on_partition_end(self, partition, epoch, tensorboard, **kwargs):
+        labels = torch.cat(self._label_storage[partition], dim=0)
+        preds = torch.cat(self._probs_storage[partition], dim=0)
+
+        f1s = []
+        for c in range(self.num_classes):
+            cur_labels = (labels == c).long()
+            cur_pred = (preds[:, c] > self.threshold).long()
+            cur_f1 = sk_metrics.f1_score(y_true=utils.to_numpy(cur_labels),
+                                         y_pred=utils.to_numpy(cur_pred),
+                                         zero_division=0)
+            f1s.append(cur_f1)
+
+        avg_f1 = np.mean(f1s)
+        self._store(partition=partition, epoch=epoch, value=avg_f1)
+        tensorboard.add_scalar(f"metrics/{partition}_{self.name}", avg_f1, epoch)
+
+    def on_iteration_end(self, outputs, batch_labels, partition, **kwargs):
+        pred = outputs[self.output_key]
+        self._probs_storage[partition].append(torch.softmax(pred, dim=1))
+        self._label_storage[partition].append(batch_labels[0])
+
+
+class MacroROCAUC(MetricWithStorage):
+    """ Macro averaged ROC AUC score for multiclass classification setting.
+    """
+    def __init__(self, num_classes: int, output_key: str = 'pred', **kwargs):
+        super(MacroROCAUC, self).__init__(**kwargs)
+        self.num_classes = num_classes
+        self.output_key = output_key
+
+        # initialize and use later
+        self._probs_storage = defaultdict(list)
+        self._label_storage = defaultdict(list)
+
+    @property
+    def name(self) -> str:
+        return "Macro ROC AUC"
+
+    def on_partition_start(self, partition, **kwargs):
+        self._probs_storage[partition] = []
+        self._label_storage[partition] = []
+
+    def on_partition_end(self, partition, epoch, tensorboard, **kwargs):
+        labels = torch.cat(self._label_storage[partition], dim=0)
+        preds = torch.cat(self._probs_storage[partition], dim=0)
+
+        aucs = []
+        for c in range(self.num_classes):
+            cur_labels = (labels == c).long()
+            cur_scores = preds[:, c]
+            try:
+                cur_auc = sk_metrics.roc_auc_score(y_true=utils.to_numpy(cur_labels),
+                                                   y_score=utils.to_numpy(cur_scores))
+            except ValueError:
+                cur_auc = np.nan
+
+            aucs.append(cur_auc)
+
+        avg_auc = np.nanmean(aucs)
+        self._store(partition=partition, epoch=epoch, value=avg_auc)
+        tensorboard.add_scalar(f"metrics/{partition}_{self.name}", avg_auc, epoch)
+
+    def on_iteration_end(self, outputs, batch_labels, partition, **kwargs):
+        pred = outputs[self.output_key]
+        self._probs_storage[partition].append(torch.softmax(pred, dim=1))
+        self._label_storage[partition].append(batch_labels[0])
+
+
+class MacroPRCAUC(MetricWithStorage):
+    """ Macro averaged PRC AUC score for multiclass classification setting.
+    """
+    def __init__(self, num_classes: int, output_key: str = 'pred', **kwargs):
+        super(MacroPRCAUC, self).__init__(**kwargs)
+        self.num_classes = num_classes
+        self.output_key = output_key
+
+        # initialize and use later
+        self._probs_storage = defaultdict(list)
+        self._label_storage = defaultdict(list)
+
+    @property
+    def name(self) -> str:
+        return "Macro PRC AUC"
+
+    def on_partition_start(self, partition, **kwargs):
+        self._probs_storage[partition] = []
+        self._label_storage[partition] = []
+
+    def on_partition_end(self, partition, epoch, tensorboard, **kwargs):
+        labels = torch.cat(self._label_storage[partition], dim=0)
+        preds = torch.cat(self._probs_storage[partition], dim=0)
+
+        aucs = []
+        for c in range(self.num_classes):
+            cur_labels = (labels == c).long()
+            cur_scores = preds[:, c]
+            (precisions, recalls, thresholds) = sk_metrics.precision_recall_curve(
+                y_true=utils.to_numpy(cur_labels),
+                probas_pred=utils.to_numpy(cur_scores)
+            )
+            cur_auc = sk_metrics.auc(recalls, precisions)
+            aucs.append(cur_auc)
+
+        avg_auc = np.nanmean(aucs)
+        self._store(partition=partition, epoch=epoch, value=avg_auc)
+        tensorboard.add_scalar(f"metrics/{partition}_{self.name}", avg_auc, epoch)
+
+    def on_iteration_end(self, outputs, batch_labels, partition, **kwargs):
+        pred = outputs[self.output_key]
+        self._probs_storage[partition].append(torch.softmax(pred, dim=1))
+        self._label_storage[partition].append(batch_labels[0])
