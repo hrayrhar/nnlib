@@ -280,14 +280,13 @@ class PRCAUC(MetricWithStorage):
 class MacroF1Score(MetricWithStorage):
     """ Macro averaged F1 score for multiclass classification setting.
     """
-    def __init__(self, num_classes: int, threshold: float = 0.5, output_key: str = 'pred', **kwargs):
+    def __init__(self, num_classes: int, output_key: str = 'pred', **kwargs):
         super(MacroF1Score, self).__init__(**kwargs)
         self.num_classes = num_classes
-        self.threshold = threshold
         self.output_key = output_key
 
         # initialize and use later
-        self._probs_storage = defaultdict(list)
+        self._preds_storage = defaultdict(list)
         self._label_storage = defaultdict(list)
 
     @property
@@ -295,17 +294,17 @@ class MacroF1Score(MetricWithStorage):
         return "Macro F1"
 
     def on_partition_start(self, partition, **kwargs):
-        self._probs_storage[partition] = []
+        self._preds_storage[partition] = []
         self._label_storage[partition] = []
 
     def on_partition_end(self, partition, epoch, tensorboard, **kwargs):
         labels = torch.cat(self._label_storage[partition], dim=0)
-        preds = torch.cat(self._probs_storage[partition], dim=0)
+        preds = torch.cat(self._preds_storage[partition], dim=0)
 
         f1s = []
         for c in range(self.num_classes):
             cur_labels = (labels == c).long()
-            cur_pred = (preds[:, c] > self.threshold).long()
+            cur_pred = (preds.argmax(dim=1) == c).long()
             cur_f1 = sk_metrics.f1_score(y_true=utils.to_numpy(cur_labels),
                                          y_pred=utils.to_numpy(cur_pred),
                                          zero_division=0)
@@ -317,7 +316,7 @@ class MacroF1Score(MetricWithStorage):
 
     def on_iteration_end(self, outputs, batch_labels, partition, **kwargs):
         pred = outputs[self.output_key]
-        self._probs_storage[partition].append(torch.softmax(pred, dim=1))
+        self._preds_storage[partition].append(pred)
         self._label_storage[partition].append(batch_labels[0])
 
 
