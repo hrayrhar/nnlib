@@ -94,7 +94,7 @@ class Accuracy(MetricWithStorage):
             labels = np.argmax(labels, axis=1)
         else:
             labels = labels.reshape(pred.shape)
-        return (pred == labels).astype(np.float).mean()
+        return (pred == labels).astype(np.float32).mean()
 
     def on_iteration_end(self, outputs, batch_labels, partition, **kwargs):
         value = self.compute_metric(preds=outputs[self.output_key],
@@ -129,7 +129,7 @@ class MulticlassScalarAccuracy(MetricWithStorage):
         assert out.shape[-1] == 1
         pred = utils.to_numpy(torch.round(out)).astype(np.int32)
         batch_labels = utils.to_numpy(batch_labels[0]).astype(np.int32).reshape(pred.shape)
-        self._iter_accuracies[partition].append((pred == batch_labels).astype(np.float).mean())
+        self._iter_accuracies[partition].append((pred == batch_labels).astype(np.float32).mean())
 
 
 class ROCAUC(MetricWithStorage):
@@ -198,7 +198,7 @@ class TopKAccuracy(MetricWithStorage):
         batch_labels = batch_labels.reshape((-1, 1)).repeat(self.k, axis=1)
         topk_correctness = (np.sum(topk_predictions == batch_labels, axis=1) >= 1)
 
-        self._iter_accuracies[partition].append(topk_correctness.astype(np.float).mean())
+        self._iter_accuracies[partition].append(topk_correctness.astype(np.float32).mean())
 
 
 class F1Score(MetricWithStorage):
