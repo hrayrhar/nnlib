@@ -82,14 +82,14 @@ class Accuracy(MetricWithStorage):
     def compute_metric(self, preds, labels):
         if preds.shape[-1] > 1:
             # multiple class
-            pred = utils.to_numpy(preds).argmax(axis=1).astype(np.int)
+            pred = utils.to_numpy(preds).argmax(axis=1).astype(np.int32)
         else:
             # binary classification
-            pred = utils.to_numpy(preds.squeeze(dim=-1) > self.threshold).astype(np.int)
+            pred = utils.to_numpy(preds.squeeze(dim=-1) > self.threshold).astype(np.int32)
             if self.plus_minus_one_binary:
                 pred = 2 * pred - 1
 
-        labels = utils.to_numpy(labels).astype(np.int)
+        labels = utils.to_numpy(labels).astype(np.int32)
         if self.one_hot:
             labels = np.argmax(labels, axis=1)
         else:
@@ -127,8 +127,8 @@ class MulticlassScalarAccuracy(MetricWithStorage):
     def on_iteration_end(self, outputs, batch_labels, partition, **kwargs):
         out = outputs[self.output_key]
         assert out.shape[-1] == 1
-        pred = utils.to_numpy(torch.round(out)).astype(np.int)
-        batch_labels = utils.to_numpy(batch_labels[0]).astype(np.int).reshape(pred.shape)
+        pred = utils.to_numpy(torch.round(out)).astype(np.int32)
+        batch_labels = utils.to_numpy(batch_labels[0]).astype(np.int32).reshape(pred.shape)
         self._iter_accuracies[partition].append((pred == batch_labels).astype(np.float).mean())
 
 
@@ -192,7 +192,7 @@ class TopKAccuracy(MetricWithStorage):
 
     def on_iteration_end(self, outputs, batch_labels, partition, **kwargs):
         pred = utils.to_numpy(outputs[self.output_key])
-        batch_labels = utils.to_numpy(batch_labels[0]).astype(np.int)
+        batch_labels = utils.to_numpy(batch_labels[0]).astype(np.int32)
 
         topk_predictions = np.argsort(-pred, axis=1)[:, :self.k]
         batch_labels = batch_labels.reshape((-1, 1)).repeat(self.k, axis=1)
