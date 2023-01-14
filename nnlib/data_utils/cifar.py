@@ -1,11 +1,12 @@
 from abc import abstractmethod
 
 from torchvision import transforms, datasets
+from torchvision.transforms.autoaugment import AutoAugmentPolicy
+
 import torch
 import numpy as np
 
 from .abstract import StandardVisionDataset
-from .autoaugment import CIFAR10Policy
 from .base import log_call_parameters
 from .noise_tools import get_uniform_error_corruption_fn, get_corruption_function_from_confusion_matrix
 
@@ -51,7 +52,7 @@ class CIFAR(StandardVisionDataset):
             return transforms.Compose([
                 transforms.RandomHorizontalFlip(),
                 transforms.RandomCrop(32, 4),
-                CIFAR10Policy(),
+                transforms.AutoAugment(AutoAugmentPolicy.CIFAR10),
                 transforms.ToTensor(),
                 self.normalize_transform
             ])
