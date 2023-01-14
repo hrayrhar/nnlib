@@ -4,8 +4,9 @@ from torchvision import transforms, datasets
 import torch
 import numpy as np
 
-from .base import log_call_parameters
 from .abstract import StandardVisionDataset
+from .autoaugment import CIFAR10Policy
+from .base import log_call_parameters
 from .noise_tools import get_uniform_error_corruption_fn, get_corruption_function_from_confusion_matrix
 
 cifar10_classes = ['airplane', 'automobile', 'bird', 'cat', 'deer', 'dog', 'frog', 'horse', 'ship', 'truck']
@@ -13,11 +14,13 @@ cifar10_classes = ['airplane', 'automobile', 'bird', 'cat', 'deer', 'dog', 'frog
 
 class CIFAR(StandardVisionDataset):
     @log_call_parameters
-    def __init__(self, n_classes: int = 10, data_augmentation: bool = False, **kwargs):
+    def __init__(self, n_classes: int = 10, data_augmentation: bool = False,
+                 autoaugment: bool = False, **kwargs):
         super(CIFAR, self).__init__(**kwargs)
         assert n_classes in [10, 100]
         self.n_classes = n_classes
         self.data_augmentation = data_augmentation
+        self.autoaugment = autoaugment
 
     @property
     def dataset_name(self) -> str:
@@ -37,12 +40,21 @@ class CIFAR(StandardVisionDataset):
 
     @property
     def train_transforms(self):
-        if not self.data_augmentation:
+        if not self.data_augmentation and not self.autoaugment:
             return self.test_transforms
-        return transforms.Compose([transforms.RandomHorizontalFlip(),
-                                   transforms.RandomCrop(32, 4),
-                                   transforms.ToTensor(),
-                                   self.normalize_transform])
+        if self.data_augmentation:
+            return transforms.Compose([transforms.RandomHorizontalFlip(),
+                                       transforms.RandomCrop(32, 4),
+                                       transforms.ToTensor(),
+                                       self.normalize_transform])
+        if self.autoaugment:
+            return transforms.Compose([
+                transforms.RandomHorizontalFlip(),
+                transforms.RandomCrop(32, 4),
+                CIFAR10Policy(),
+                transforms.ToTensor(),
+                self.normalize_transform
+            ])
 
     @property
     def test_transforms(self):
