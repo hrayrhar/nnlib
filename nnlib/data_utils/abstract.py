@@ -74,7 +74,7 @@ class StandardVisionDataset(ABC):
         test_data = self.raw_dataset(data_dir, download=download, split='test', transform=self.test_transforms)
 
         # split train and validation
-        if val_data is None:
+        if val_data is None and (val_ratio is not None) and val_ratio > 0.0:
             logging.info(f"Dataset {self.dataset_name} has no validation set. Splitting the training set...")
             train_indices, val_indices = get_split_indices(len(train_data), val_ratio, seed)
             if num_train_examples is not None:
@@ -95,8 +95,9 @@ class StandardVisionDataset(ABC):
 
         # name datasets and save statistics
         for dataset in [train_data, val_data, test_data]:
-            dataset.dataset_name = self.dataset_name
-            dataset.statistics = (self.means, self.stds)
+            if dataset is not None:
+                dataset.dataset_name = self.dataset_name
+                dataset.statistics = (self.means, self.stds)
 
         return train_data, val_data, test_data, info
 
